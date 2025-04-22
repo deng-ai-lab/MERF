@@ -170,7 +170,7 @@ if __name__ == '__main__':
     
     results = val(MERF, gen_val_for_test, device)
 
-    results_save_path = 'logs/pretrain/' + loss_history.get_str() + "abbind_test_results.csv"
+    results_save_path = 'logs/pretrain/' + loss_history.get_str() + "/abbind_test_results.csv"
     results.to_csv(results_save_path, index=False)
 
     pear, p_value = pearsonr(results["Prediction"], results["Ground Truth"])
