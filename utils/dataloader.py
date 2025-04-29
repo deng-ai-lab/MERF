@@ -120,11 +120,10 @@ class ABbindDataset(Dataset):
 
 
 class ABbindEvoDataset(Dataset):
-    def __init__(self, data_df, is_train, knn_num, knn_agents_num):
+    def __init__(self, data_df, knn_num, knn_agents_num):
         super(ABbindEvoDataset, self).__init__()
 
         self.data_df = data_df
-        self.is_train = is_train
         self.knn_num = knn_num
         self.knn_agents_num = knn_agents_num
 
@@ -135,17 +134,8 @@ class ABbindEvoDataset(Dataset):
         return np.random.rand() * (b - a) + a
 
     def __getitem__(self, index):
-        """
-
-        :param
-            mutate_info: accumulated mutation info with respect to the initial wild type
-            mutate_num: accumulated mutation number
-        :return:
-        """
 
         index = index % len(self.data_df['PDB_id'])
-        sample_info = self.data_df.iloc[index].values
-        # PDB_id, partners, antibody_type, antibody_chain, seq_len, sequence, CDRH3, mutate_info, mutate_num, docking_energy, file_index = sample_info
         
         PDB_id = self.data_df['PDB_id'].iloc[index]
         partners = self.data_df['chain'].iloc[index]
@@ -159,21 +149,8 @@ class ABbindEvoDataset(Dataset):
         docking_energy = 'no_docking'
         file_index = PDB_id
         
-        # print(PDB_id, partners, antibody_type, antibody_chain, seq_len, sequence, CDRH3, mutate_info, mutate_num, docking_energy)
-        
-        # in this settings, mutate_info is used to track the wild type files (no mutate file before sampling!)
-        # no need the format change below, but remember that seperate the mutate_info with _ when saving new ones
-        
         path0 = os.getcwd()
-        # path0 = "/home/lfj/projects_dir/Antibody_Mutation"
-
-        # if mutate_info == 'no_mutate':
-        #     PDB_wt_file_path = path0 + '/data/ABbind/PDBs_fixed/' + str(PDB_id) + '.pdb'
-        # else:
-        #     PDB_wt_file_path = path0 + '/data/ABbind/PDBs_fixed/' + str(PDB_id) + '_' + str(mutate_info) + '.pdb'
-
         PDB_wt_file_path = path0 + '/data/ABbind/PDBs_fixed/' + PDB_id + '.pdb'
-        
         complex_wt_info = parse_pdb(PDB_wt_file_path)
 
         transform = KnnResidue(num_neighbors=self.knn_num)
@@ -200,11 +177,10 @@ class ABbindEvoDataset(Dataset):
 
 
 class SARSEvoDataset(Dataset):
-    def __init__(self, data_df, is_train, knn_num, knn_agents_num):
+    def __init__(self, data_df, knn_num, knn_agents_num):
         super(SARSEvoDataset, self).__init__()
         
         self.data_df = data_df
-        self.is_train = is_train
         self.knn_num = knn_num
         self.knn_agents_num = knn_agents_num
     
@@ -215,39 +191,18 @@ class SARSEvoDataset(Dataset):
         return np.random.rand() * (b - a) + a
     
     def __getitem__(self, index):
-        """
-
-        :param
-            mutate_info: accumulated mutation info with respect to the initial wild type
-            mutate_num: accumulated mutation number
-        :return:
-        """
         
         index = index % len(self.data_df['PDB_id'])
-        sample_info = self.data_df.iloc[index].values
-        # PDB_id, partners, antibody_type, antibody_chain, seq_len, sequence, CDRH3, mutate_info, mutate_num, docking_energy, file_index = sample_info
-        
         PDB_id = self.data_df['PDB_mut_id'].iloc[index]
         partners = self.data_df['partner'].iloc[index]
         antibody_type = self.data_df['antibody_type'].iloc[index]
         antibody_chain = self.data_df['antibody_chain'].iloc[index]
         sequence = self.data_df['seq'].iloc[index]
         CDRH3 = self.data_df['CDRH3'].iloc[index]
-        
-        # print(PDB_id, partners, antibody_type, antibody_chain, seq_len, sequence, CDRH3, mutate_info, mutate_num, docking_energy)
-        
-        # in this settings, mutate_info is used to track the wild type files (no mutate file before sampling!)
-        # no need the format change below, but remember that seperate the mutate_info with _ when saving new ones
-        
+
         path0 = os.getcwd()
-        # path0 = "/home/lfj/projects_dir/Antibody_Mutation"
         
-        # if mutate_info == 'no_mutate':
-        #     PDB_wt_file_path = path0 + '/data/ABbind/PDBs_fixed/' + str(PDB_id) + '.pdb'
-        # else:
-        #     PDB_wt_file_path = path0 + '/data/ABbind/PDBs_fixed/' + str(PDB_id) + '_' + str(mutate_info) + '.pdb'
-        
-        PDB_wt_file_path = path0 + '/data/SARS_COV_2_Antibody/PDBs_mutated/' + PDB_id + '.pdb'
+        PDB_wt_file_path = path0 + '/data/SARS_COV_2/PDBs_mutated/' + PDB_id + '.pdb'
         
         complex_wt_info = parse_pdb(PDB_wt_file_path)
         

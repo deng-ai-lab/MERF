@@ -83,7 +83,7 @@ class GeometricAttention(nn.Module):
         self.layer_norm = nn.LayerNorm(node_feat_dim)
 
     def _node_logits(self, x):
-        query_l = _heads(self.proj_query(x), self.num_heads, self.query_key_dim)  # (N, L, n_heads, qk_ch) attention计算的技巧，用线性层输出总维度，再进行拆分
+        query_l = _heads(self.proj_query(x), self.num_heads, self.query_key_dim)  # (N, L, n_heads, qk_ch)
         key_l = _heads(self.proj_key(x), self.num_heads, self.query_key_dim)  # (N, L, n_heads, qk_ch)
 
         query_l = query_l.permute(0, 2, 1, 3)  # (N,L1,H,C) -> (N,H,L1,C)

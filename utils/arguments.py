@@ -1,6 +1,5 @@
 import argparse
 
-
 def get_pretrain_args():
     parser = argparse.ArgumentParser()
 
@@ -72,23 +71,8 @@ def get_evolution_args():
     parser.add_argument('--hypernet_layers', type=int, default=2, help='the layer of hypernet')
 
     # ----------------------- evolution settings ----------------------- #
-    parser.add_argument('--evo_pdb_id', type=str, default='6YZ5_omicron', help='the pdb file to be optimized')
-    parser.add_argument('--iter_num', type=int, default=0, help='the pdb file to be optimized')  # for 5 max single, start at 0 end at 4
-    parser.add_argument('--task', type=str, default='abbind', help='abbind, sars')
-
-    # evolution settings remake
-    # parser.add_argument('--iterations_per_epoch', type=int, default=32, help='the pdb file to be optimized')
-    parser.add_argument('--iterations_per_epoch', type=int, default=1, help='the pdb file to be optimized')  # todo: test
-    parser.add_argument('--server_id', type=int, default=147, help='when 57 and 147 (128 now), using mpi version')
-    parser.add_argument('--training_times', type=int, default=5, help='times for updating using one batch data')
-    parser.add_argument('--fix_encoder', type=bool, default=False, help='whether to fix the parameters of encoder in evo')
-
-    # evolution settings rebirth
     parser.add_argument('--comb_num', type=int, default=3, help='numbers of mutations')
-    # parser.add_argument('--comb_num', type=int, default=1, help='numbers of mutations')  # todo: fast test
-    parser.add_argument('--pdb_index', type=int, default=0, help='which pdb to evo')  # todo: fast test
-    parser.add_argument('--pdb_start_index', type=int, default=0, help='which pdb to evo')  # todo: fast test
-    parser.add_argument('--pdb_end_index', type=int, default=3, help='which pdb to evo')  # todo: fast test
+    parser.add_argument('--training_times', type=int, default=5, help='times for updating using one batch data')
 
     args = parser.parse_args()
     return args

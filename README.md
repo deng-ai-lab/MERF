@@ -53,9 +53,9 @@ export PATH="{PATH_TO_ROSETTA}/rosetta.source.release-340/main/source/bin/:$PATH
 export LD_LIBRARY_PATH="{PATH_TO_MPI}/mpi_instll/lib/":$LD_LIBRARY_PATH
 ```
 
-The Rosetta software paths in `evo_abbind.py` and `evo_sars.py` are expected to changed as the software installation path. For evolution tasks, user can select run `evo_abbind.py` to evolve antibodies in AB-Bind and `evo_sars.py` to evolve antibodies to bind three major SARS-CoV-2 variants.
+For evolution tasks, user can select to run `evo_abbind.py` to evolve antibodies in AB-Bind and `evo_sars.py` to evolve antibodies to bind three major SARS-CoV-2 variants.
 
 ## Copyright
 Software provided as is under **MIT License**.
 
-Fengji Li @ 2025 BUAA and Deng ai Lab
+Fengji Li @ 2025 BUAA and Deng AI Lab
