@@ -1,6 +1,6 @@
-
+logs/
 data/
-
+docking/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
