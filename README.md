@@ -35,7 +35,7 @@ To enable antibody evolution with Rosetta Docking protocol, users can install Ro
 
 The SKEMPI v2.0 dataset is downloaded from [SKEMPI v2](https://life.bsc.es/pid/skempi2/). The AB-Bind dataset is downloaded from [AB-Bind](https://github.com/sarahsirin/AB-Bind-Database).
 
-For reproductivity, we provide structures after atom repairation in  `\data`, both wild-type and mutant Ab-Ag complexes.
+For reproductivity, we provide zip files of structures after atom repairation in  `\data`, both wild-type and mutant Ab-Ag complexes. Users are encouraged to unzip these files before running scripts.
 
 ## Usage
 
