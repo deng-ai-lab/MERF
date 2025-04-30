@@ -8,7 +8,7 @@ Antibodies hold a vast potential for biomedical applications and therapeutic dev
 
 To address these challenges, we introduce MERF, a multi-agent reinforcement learning framework designed to efficiently explore multi-residue evolutionary space for antibody affinity enhancement. MERF redefines antibody evolution as a policy-making process rather than following traditional prediction-driven frameworks. MERF alternates between generating mutation policy and learning value function based on the binding energy change, providing an efficient reinforcing framework for discovering affinity-enhancing multi-site mutations while minimizing computational costs.
 
-![Overview of MERF](overview.jpg)
+![Overview of MERF](overview.png)
 
 ## MERF software package
 
