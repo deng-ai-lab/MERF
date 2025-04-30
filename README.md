@@ -8,6 +8,7 @@ Antibodies hold a vast potential for biomedical applications and therapeutic dev
 
 To address these challenges, we introduce MERF, a multi-agent reinforcement learning framework designed to efficiently explore multi-residue evolutionary space for antibody affinity enhancement. MERF redefines antibody evolution as a policy-making process rather than following traditional prediction-driven frameworks. MERF alternates between generating mutation policy and learning value function based on the binding energy change, providing an efficient reinforcing framework for discovering affinity-enhancing multi-site mutations while minimizing computational costs.
 
+![Overview of MERF](utils/overview.jpg)
 
 ## MERF software package
 
@@ -29,23 +30,9 @@ To install MERF package, use
 git clone https://github.com/deng-ai-lab/MERF
 ```
 
-To enable antibody evolution with Rosetta Docking protocol, users can install Rosetta and compile it in Massage Passing Interface (MPI) format, following [Rosetta Documents](https://docs.rosettacommons.org/demos/latest/tutorials/install_build/install_build)
+To enable antibody evolution using the Rosetta Docking protocol, users are recommended to install Rosetta and compile it in Message Passing Interface (MPI) format, following the instructions in the [Rosetta Documents](https://docs.rosettacommons.org/demos/latest/tutorials/install_build/install_build)
 
-## Dataset
-
-The SKEMPI v2.0 dataset is downloaded from [SKEMPI v2](https://life.bsc.es/pid/skempi2/). The AB-Bind dataset is downloaded from [AB-Bind](https://github.com/sarahsirin/AB-Bind-Database).
-
-For reproductivity, we provide zip files of structures after atom repairation in  `\data`, both wild-type and mutant Ab-Ag complexes. Users are encouraged to download and unzip these files before running scripts from [Data](https://bhpan.buaa.edu.cn/link/AA4559117CC4E843D9BF9AC782C5D4E009).
-
-## Usage
-
-### Pretrain MERF
-
-By running `pretrain_and_val.py` scripts, users can get pretrained MERF parameters with cross-validation results in AB-Bind dataset. 
-
-### Antibody evolution
-
-To enable antibody evolution, users should install and compile Rosetta in MPI format first. After installation, users can run the following code to make ensure the environment variables.
+After Rosetta installation, ensure the relevant environment variables are properly configured by executing:
 
 ```
 export PATH="{PATH_TO_MPI}/mpi_instll/bin/:$PATH"
@@ -53,7 +40,28 @@ export PATH="{PATH_TO_ROSETTA}/rosetta.source.release-340/main/source/bin/:$PATH
 export LD_LIBRARY_PATH="{PATH_TO_MPI}/mpi_instll/lib/":$LD_LIBRARY_PATH
 ```
 
-For evolution tasks, user can select to run `evo_abbind.py` to evolve antibodies in AB-Bind and `evo_sars.py` to evolve antibodies to bind three major SARS-CoV-2 variants.
+To enable antibody mutation, ensure that the required executables are accessible by running the following commands:
+```
+cd protein
+chmod +x profix
+chmod +x scap
+```
+
+## Dataset
+
+The SKEMPI v2.0 dataset is available at [SKEMPI v2](https://life.bsc.es/pid/skempi2/), and the AB-Bind dataset can be accessed from [AB-Bind](https://github.com/sarahsirin/AB-Bind-Database).
+
+To ensure reproducibility, we provide preprocessed structure files (after atom repair) for both wild-type and mutant Ab–Ag complexes in the `\data` directory. Users are encouraged to download and extract the provided archive from [Data](https://bhpan.buaa.edu.cn/link/AA4559117CC4E843D9BF9AC782C5D4E009) before executing the scripts.
+
+## Usage
+
+### Pretrain MERF
+
+To pretrain MERF, run the `pretrain_and_val.py` script. This will train MERF on the AB-Bind dataset with built-in cross-validation and output pretrained parameters for downstream tasks.
+
+### Antibody evolution
+
+For evolution tasks, use `evo_abbind.py` to evolve antibodies within the AB-Bind dataset, or `evo_sars.py` to optimize antibodies targeting three major SARS-CoV-2 variants.
 
 ## Copyright
 Software provided as is under **MIT License**.
