@@ -1,0 +1,1 @@
+tensorboard --logdir=logs/pretrain_vm

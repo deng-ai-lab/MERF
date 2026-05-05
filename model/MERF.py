@@ -1,4 +1,3 @@
-import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -19,77 +18,120 @@ class MERF(nn.Module):
         self.encoder = GeoIPAEncoder(args)
         self.agent = BaseAgent(args)
         self.mixer = QMixer(args)
-        
+
         # loss function
         self.loss_fn = torch.nn.MSELoss()
-        
-        self.bn = nn.BatchNorm1d(num_features=self.args.obs_shape)
+
+        # self.bn = nn.BatchNorm1d(num_features=self.args.obs_shape)
+        self.ln = nn.LayerNorm(self.args.obs_shape)
+
+        # KL loss settings
+        self.use_kl_loss = getattr(args, 'use_kl_loss', False)
+        self.kl_loss_weight = getattr(args, 'kl_loss_weight', 0.1)
 
     def add_aa_id(self, batch_embed, complex_info):
         aa_onehot = F.one_hot(complex_info['aa'], 21)
         return torch.cat((batch_embed, aa_onehot), dim=2)
-    
-    def generate_positional_embedding(self, feature_dim):
-        pos = torch.arange(2).unsqueeze(1)  # [seq_len, 1]
-        div_term = torch.exp(torch.arange(0, feature_dim, 2) * (-math.log(10000.0) / feature_dim))
-        pe = torch.zeros(2, feature_dim)
-        pe[:, 0::2] = torch.sin(pos * div_term)
-        pe[:, 1::2] = torch.cos(pos * div_term)
-        
-        return pe
-        
-    def add_mutation_mask(self, batch_embed, mutation_mask):
-        bs, seq_len, feat_dim = batch_embed.shape
-        
-        # by positional encoding, no new dimension added
-        
-        pe = self.generate_positional_embedding(feat_dim).to(batch_embed.device)
-        mutation_mask_ = mutation_mask.unsqueeze(-1).repeat(1, 1, feat_dim)
 
-        true_encoding = pe[1, :].unsqueeze(0).unsqueeze(0).repeat(bs, seq_len, 1)  # [64, 128, 128]
-        false_encoding = pe[0, :].unsqueeze(0).unsqueeze(0).repeat(bs, seq_len, 1)  # [64, 128, 128]
+    def compute_kl_loss(self, qs_wt, batch, device):
+        """Compute KL divergence loss between Q-value distribution and target ddG distribution.
 
-        selected_encoding = torch.where(mutation_mask_, true_encoding, false_encoding)
-        
-        output_embed = batch_embed + selected_encoding
-        
-        return output_embed
-    
+        Args:
+            qs_wt: Q-values from agent, shape [batch_size, seq_len, 20]
+            batch: batch dict containing 'mutation_mask', 'kl_target', 'has_kl_target'
+            device: torch device
+
+        Returns:
+            kl_loss: KL divergence loss (scalar), or 0 if no valid samples
+        """
+        if 'kl_target' not in batch or 'has_kl_target' not in batch:
+            return torch.tensor(0.0, device=device)
+
+        mutation_mask = batch['mutation_mask']  # [batch_size, seq_len]
+        kl_target = batch['kl_target'].to(device).float()  # [batch_size, 20]
+        has_kl_target = batch['has_kl_target'].to(device)  # [batch_size]
+
+        batch_size = qs_wt.shape[0]
+
+        # Collect Q-values at mutation positions for each sample
+        qs_mutation_list = []
+        for i in range(batch_size):
+            # Get mutation positions for this sample
+            mut_pos = mutation_mask[i].nonzero(as_tuple=True)[0]
+            if len(mut_pos) > 0:
+                # For single mutation, take the first (and only) mutation position
+                qs_mutation_list.append(qs_wt[i, mut_pos[0]])
+            else:
+                # No mutation found, use zeros (will be masked out anyway)
+                qs_mutation_list.append(torch.zeros(20, device=device))
+
+        qs_mutation = torch.stack(qs_mutation_list, dim=0)  # [batch_size, 20]
+
+        # Only compute loss for samples with valid KL targets
+        valid_mask = has_kl_target  # [batch_size]
+        if valid_mask.sum() == 0:
+            return torch.tensor(0.0, device=device)
+
+        # Get valid samples
+        qs_valid = qs_mutation[valid_mask]  # [n_valid, 20]
+        kl_target_valid = kl_target[valid_mask]  # [n_valid, 20]
+
+        # Convert Q-values to probability distribution
+        # Lower Q-value means better mutation, so we use -Q for softmax
+        pred_prob = F.softmax(-qs_valid, dim=1)  # [n_valid, 20]
+
+        # Convert target ddG to probability distribution
+        # Lower ddG means better mutation, so we use -ddG for softmax
+        target_prob = F.softmax(-kl_target_valid, dim=1)  # [n_valid, 20]
+
+        # Compute KL divergence: KL(target || pred)
+        # Using F.kl_div with log_target=False
+        eps = 1e-8
+        kl_loss = (target_prob * (torch.log(target_prob + eps) - torch.log(pred_prob + eps))).sum(dim=1).mean()
+
+        return kl_loss
+
     def forward(self, batch, device):
 
-        # get batch size
-        batch_size = len(batch['wt']['name'])
-
-        # get label
         ddG = batch['ddG'].to(device)
         ddG = ddG.to(torch.float32)
 
         # ----------------------- Local mutation policy generation ----------------------- #
         # feature update
-        batch_embedding_wt, _ = self.encoder(batch['wt'], batch['mutation_mask'])
-        batch_embedding_mut, _ = self.encoder(batch['mut'], batch['mutation_mask'])
+        batch_embedding_wt = self.encoder(batch['wt'], batch['mutation_mask'])
+        batch_embedding_mut = self.encoder(batch['mut'], batch['mutation_mask'])
 
-        batch_embedding_wt = self.bn(batch_embedding_wt.transpose(1, 2)).transpose(1, 2)
-        batch_embedding_mut = self.bn(batch_embedding_mut.transpose(1, 2)).transpose(1, 2)
-        
+        # batch_embedding_wt = self.bn(batch_embedding_wt.transpose(1, 2)).transpose(1, 2)
+        # batch_embedding_mut = self.bn(batch_embedding_mut.transpose(1, 2)).transpose(1, 2)
+
+        batch_embedding_wt = self.ln(batch_embedding_wt)
+        batch_embedding_mut = self.ln(batch_embedding_mut)
+
         # policy making
         batch_embedding_wt_ = self.add_aa_id(batch_embedding_wt, batch['wt'])
         qs_wt = self.agent(batch_embedding_wt_)
-        
+
         # ----------------------- global mutational effects estimation ----------------------- #
         q_tot, _ = self.mixer(qs_wt, batch, device, batch_embedding_wt, batch_embedding_mut)
 
-        q_tot = q_tot.reshape(batch_size)
-        
-        loss = self.loss_fn(q_tot, ddG)
+        mse_loss = self.loss_fn(q_tot, ddG.squeeze())
 
-        return q_tot, loss
+        # ----------------------- KL distribution loss (optional) ----------------------- #
+        if self.use_kl_loss:
+            kl_loss = self.compute_kl_loss(qs_wt, batch, device)
+            total_loss = mse_loss + self.kl_loss_weight * kl_loss
+        else:
+            kl_loss = torch.tensor(0.0, device=device)
+            total_loss = mse_loss
+
+        return q_tot, total_loss, mse_loss, kl_loss
 
     def choose_best_action(self, batch, device):
 
-        batch_embedding_wt, _ = self.encoder(batch['wt'], batch['mutation_mask'])
+        batch_embedding_wt = self.encoder(batch['wt'], batch['mutation_mask'])
         
-        batch_embedding_wt = self.bn(batch_embedding_wt.transpose(1, 2)).transpose(1, 2)
+        # batch_embedding_wt = self.bn(batch_embedding_wt.transpose(1, 2)).transpose(1, 2)
+        batch_embedding_wt = self.ln(batch_embedding_wt)
         
         batch_embedding_wt_ = self.add_aa_id(batch_embedding_wt, batch['wt'])
 

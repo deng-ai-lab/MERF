@@ -1,6 +1,12 @@
 logs/
 data/
 docking/
+baselines/
+CLAUDE.md
+.claude/
+.codex
+.vscode/
+protein/ANARCI/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

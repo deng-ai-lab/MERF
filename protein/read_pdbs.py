@@ -144,7 +144,6 @@ def parse_complex(structure0, model_id=None):
         'pos14_mask': torch.stack(pos14_mask),
     }
 
-
 def parse_pdb(path, model_id=0):
     """
     An entrance for parse_complex, the handle for read a pdb file
@@ -159,6 +158,49 @@ def parse_pdb(path, model_id=0):
     except Exception as e:
         print("file not existed!", path)
     return parse_complex(structure, model_id)
+
+def parse_pdb_chain2sequence(path, model_id=0):
+
+    warnings.simplefilter('ignore', BiopythonWarning)
+    parser = PDBParser()
+
+    try:
+        structure = parser.get_structure(None, path)[model_id]
+    except Exception as e:
+        print("file not existed!", path)
+
+    chains = Selection.unfold_entities(structure, 'C')
+
+    chain2sequence = dict()
+
+    # 按chain顺序读入，方便和parse_pdb获得的信息对应
+    chains_id = []
+    for chain in chains:
+        chains_id.append(ord(chain.id))
+
+    chains_id = np.array(chains_id)
+    idx_array = chains_id.argsort()
+
+    for i in range(len(chains)):
+        chain = chains[idx_array[i]]
+
+        seq = []
+        for res in chain:
+            resname = res.get_resname()
+            # filtering
+            if not augmented_is_aa(resname): continue
+            if not (res.has_id('CA') and res.has_id('C') and res.has_id('N')): continue
+
+            # Residue types
+            one_code = augmented_three_to_one(resname)
+            seq.append(one_code)
+
+        if len(seq) == 0:
+            continue
+        
+        chain2sequence[chain.id] = ''.join(seq)
+
+    return chain2sequence
 
 def _mask_list(l, mask):
     return [l[i] for i in range(len(l)) if mask[i]]
@@ -300,5 +342,95 @@ class PaddingCollate(object):
                 for k, v in data.items() if k in ('wt', 'mut', 'ddG', 'mutation_mask', 'index_info', 'mutation', 'expand_data_info')
             }
             data_padded['mask'] = self._get_pad_mask(data[self.length_ref_key].size(0), max_length)
+
+            # Handle KL target fields (no padding needed as they have fixed size)
+            if 'kl_target' in data:
+                data_padded['kl_target'] = data['kl_target']
+            if 'has_kl_target' in data:
+                data_padded['has_kl_target'] = data['has_kl_target']
+            # if 'rank_target' in data:
+            #     data_padded['rank_target'] = data['rank_target']
+            # if 'rank_mask' in data:
+            #     data_padded['rank_mask'] = data['rank_mask']
+            # if 'has_rank_target' in data:
+            #     data_padded['has_rank_target'] = data['has_rank_target']
+
+            data_list_padded.append(data_padded)
+        return default_collate(data_list_padded)
+
+
+class PaddingCollate2(object):
+
+    def __init__(self, length_ref_key='mutation_mask', pad_values={'aa': 20, 'pos14': float('999'), 'icode': ' ', 'chain_id': '-'}, donot_pad={'foldx'}, eight=False):
+        super().__init__()
+        self.length_ref_key = length_ref_key
+        self.pad_values = pad_values
+        self.donot_pad = donot_pad
+        self.eight = eight
+
+    def _pad_last(self, x, n, value=0):
+        if isinstance(x, torch.Tensor):
+            assert x.size(0) <= n
+            if x.size(0) == n:
+                return x
+            pad_size = [n - x.size(0)] + list(x.shape[1:])
+            pad = torch.full(pad_size, fill_value=value).to(x)
+            return torch.cat([x, pad], dim=0)
+        elif isinstance(x, list):
+            pad = [value] * (n - len(x))
+            return x + pad
+        elif isinstance(x, str):
+            if value == 0:  # Won't pad strings if not specified
+                return x
+            pad = value * (n - len(x))
+            return x + pad
+        elif isinstance(x, dict):
+            padded = {}
+            for k, v in x.items():
+                if k in self.donot_pad:
+                    padded[k] = v
+                else:
+                    padded[k] = self._pad_last(v, n, value=self._get_pad_value(k))
+            return padded
+        else:
+            return x
+
+    @staticmethod
+    def _get_pad_mask(l, n):
+        return torch.cat([
+            torch.ones([l], dtype=torch.bool),
+            torch.zeros([n-l], dtype=torch.bool)
+        ], dim=0)
+
+    def _get_pad_value(self, key):
+        if key not in self.pad_values:
+            return 0
+        return self.pad_values[key]
+
+    def __call__(self, data_list):
+
+        max_length = max([data[self.length_ref_key].size(0) for data in data_list])
+        if self.eight:
+            max_length = math.ceil(max_length / 8) * 8
+        data_list_padded = []
+        for data in data_list:
+            data_padded = {
+                k: self._pad_last(v, max_length, value=self._get_pad_value(k))
+                for k, v in data.items() if k in ('wt', 'mut', 'ddG', 'mutation_mask', 'index_info', 'mutation', 'expand_data_info')
+            }
+            data_padded['mask'] = self._get_pad_mask(data[self.length_ref_key].size(0), max_length)
+
+            # Handle KL target fields (no padding needed as they have fixed size)
+            # if 'kl_target' in data:
+            #     data_padded['kl_target'] = data['kl_target']
+            # if 'has_kl_target' in data:
+            #     data_padded['has_kl_target'] = data['has_kl_target']
+            if 'rank_target' in data:
+                data_padded['rank_target'] = data['rank_target']
+            if 'rank_mask' in data:
+                data_padded['rank_mask'] = data['rank_mask']
+            if 'has_rank_target' in data:
+                data_padded['has_rank_target'] = data['has_rank_target']
+
             data_list_padded.append(data_padded)
         return default_collate(data_list_padded)

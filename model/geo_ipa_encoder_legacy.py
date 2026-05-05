@@ -211,7 +211,7 @@ class GeoIPAEncoder(nn.Module):
             for _ in range(args.ga_layer)
         ])
 
-        self.coefficient = nn.Parameter(torch.ones(2, 21, args.feat_dim), requires_grad=True)
+        self.coefficient = nn.Parameter(torch.ones(3, 2, 21, args.feat_dim), requires_grad=True)
 
     def generate_positional_embedding(self, feature_dim):
         pos = torch.arange(2).unsqueeze(1)  # [seq_len, 1]
@@ -263,14 +263,29 @@ class GeoIPAEncoder(nn.Module):
         res_feat_IPA = res_feat
         for IPA_block in self.IPA_blocks:
             res_feat_IPA = IPA_block(res_feat_IPA, pair_feat, rotations=R, translations=t,
-                                     mask=mask_residue)
+                                     mask=mask_residue)  # Residual connection within the block
         
-        # GA forward
-        res_feat_GA = res_feat
-        for GA_block in self.GA_blocks:
-            res_feat_GA = GA_block(R, t, get_pos_CB(pos14, mask_atom), res_feat_GA, pair_feat, mask_residue)
+        # GA forward and feature integration
 
-        # combine IPA and GA features
-        res_feat_mixed = self.coefficient[0, aa, :] * res_feat_GA + self.coefficient[1, aa, :] * res_feat_IPA
+        res_feat_ga = res_feat
+        res_feat_ga_1 = self.ga_encoder.encoder_layer_1(R, t, get_pos_CB(pos14, mask_atom), res_feat_ga, pair_feat, mask_residue)  # (N, L, feat_dim)
 
-        return res_feat_mixed
+        res_feat_mix_1 = self.coefficient[0, 0, aa, :] * res_feat_ga_1 + \
+                            self.coefficient[0, 1, aa, :] * res_feat_IPA
+
+        res_feat_ga_2 = self.ga_encoder.encoder_layer_2(R, t, get_pos_CB(pos14, mask_atom), res_feat_mix_1,
+                                                        pair_feat, mask_residue)  # (N, L, feat_dim)
+
+        res_feat_mix_2 = self.coefficient[1, 0, aa, :] * res_feat_ga_2 + \
+                        self.coefficient[1, 1, aa, :] * res_feat_IPA
+
+        res_feat_ga_3 = self.ga_encoder.encoder_layer_3(R, t, get_pos_CB(pos14, mask_atom), res_feat_mix_2,
+                                                        pair_feat, mask_residue)  # (N, L, feat_dim)
+
+        res_feat_ipa_updated = self.coefficient[2, 0, aa, :] * res_feat_ga_3 + \
+                        self.coefficient[2, 1, aa, :] * res_feat_IPA
+
+        local_state = res_feat_ga_3
+        global_state = res_feat_ipa_updated
+
+        return local_state, global_state
