@@ -4,6 +4,7 @@ def get_pretrain_args():
     parser = argparse.ArgumentParser()
 
     # ----------------------- the environment settings ----------------------- #
+    # parser.add_argument('--seed', type=int, default=173, help='random seed')
     parser.add_argument('--seed', type=int, default=170, help='random seed')
     parser.add_argument('--batch_size', type=int, default=64, help='batch size for training')
     parser.add_argument('--lr', type=float, default=1e-4, help='the initial learning rate')
@@ -27,7 +28,7 @@ def get_pretrain_args():
 
     # ----------------------- KL distribution loss settings ----------------------- #
     parser.add_argument('--use_kl_loss', type=bool, default=True, help='whether to use KL divergence loss for site mutation distribution')
-    parser.add_argument('--kl_loss_weight', type=float, default=4.0, help='weight for KL divergence loss')
+    parser.add_argument('--kl_loss_weight', type=float, default=3.5, help='weight for KL divergence loss')
 
     # ----------------------- Ranking loss settings (v2) ----------------------- #
     parser.add_argument('--use_rank_loss', type=bool, default=True, help='whether to use pairwise RankNet loss for site mutation ranking')

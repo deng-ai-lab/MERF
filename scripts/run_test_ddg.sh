@@ -4,14 +4,12 @@
 # Usage: bash scripts/run_test_ddg.sh
 
 # Configuration - modify these variables as needed
-# LOG_DIR="/home/dataset-local/projects_dir/MERF/logs/pretrain_vm/2026_04_29_20_39_33"
-# LOG_DIR="/home/dataset-local/projects_dir/MERF/logs/pretrain_vm/2026_04_29_20_40_47"
-LOG_DIR="/home/dataset-local/projects_dir/MERF/logs/pretrain_vm/2026_04_29_20_41_43"
+LOG_DIR="/home/dataset-local/projects_dir/MERF/logs/pretrain_vm/2026_05_07_20_57_23"
 # TEST_DATASETS="vm,abbind,cr_6261_h1,cr_6261_h9,cr_9114_h1,cr_9114_h3,7fae"
 # TEST_DATASETS="7fae"
-TEST_DATASETS="cr_6261_h1,cr_6261_h9,cr_9114_h1,cr_9114_h3,7fae"
+TEST_DATASETS="cr_9114_h1,cr_9114_h3"
 GPU_IDX=0
-EPOCH=50
+EPOCH=150
 BATCH_SIZE=128
 
 # Run test

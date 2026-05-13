@@ -1,1 +1,1 @@
-tensorboard --logdir=logs/pretrain_vm
+tensorboard --logdir=logs/pretrain_vm --port=6783 --host=localhost
