@@ -4,8 +4,8 @@ def get_pretrain_args():
     parser = argparse.ArgumentParser()
 
     # ----------------------- the environment settings ----------------------- #
-    # parser.add_argument('--seed', type=int, default=173, help='random seed')
-    parser.add_argument('--seed', type=int, default=170, help='random seed')
+    parser.add_argument('--seed', type=int, default=172, help='random seed')
+    # parser.add_argument('--seed', type=int, default=170, help='random seed')
     parser.add_argument('--batch_size', type=int, default=64, help='batch size for training')
     parser.add_argument('--lr', type=float, default=1e-4, help='the initial learning rate')
     parser.add_argument('--is_cuda', type=bool, default=True, help='whether to use cuda')
