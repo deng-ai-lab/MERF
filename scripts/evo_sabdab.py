@@ -2,6 +2,7 @@ import os
 import numpy as np
 import pandas as pd
 import datetime
+import pickle
 
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -27,6 +28,60 @@ from protein.mutate_scripts import mut_list_abbind
 cpu_num = 32
 torch.set_num_threads(cpu_num)
 print(cpu_num)
+
+CHECKPOINT_MODEL_ARG_KEYS = (
+    'use_plm_embedding',
+    'plm_path',
+    'feat_dim',
+    'rel_dim',
+    'max_relpos',
+    'ipa_layer',
+    'ga_layer',
+    'knn_neighbors_num',
+    'knn_agents_num',
+    'obs_shape',
+    'n_actions',
+    'n_agents',
+    'agent_hidden_dim',
+    'mixer_rel_dim',
+    'mixer_ga_layer',
+    'mixing_embed_dim',
+    'hypernet_embed',
+    'hypernet_layers',
+    'use_kl_loss',
+    'kl_loss_weight',
+)
+
+
+def load_model_args_from_checkpoint(args):
+    checkpoint_dir = os.path.dirname(os.path.abspath(args.model_load_path))
+    args_path = os.path.join(checkpoint_dir, 'args.pkl')
+
+    if not os.path.exists(args_path):
+        print(f'Checkpoint args not found at {args_path}; using evolution args for model init.')
+        return None, []
+
+    with open(args_path, 'rb') as f:
+        checkpoint_args = pickle.load(f)
+
+    if not hasattr(checkpoint_args, '__dict__'):
+        raise TypeError(f'Unsupported checkpoint args type in {args_path}: {type(checkpoint_args)}')
+
+    checkpoint_args_dict = vars(checkpoint_args)
+    loaded_keys = []
+    for key in CHECKPOINT_MODEL_ARG_KEYS:
+        if key in checkpoint_args_dict:
+            setattr(args, key, checkpoint_args_dict[key])
+            loaded_keys.append(key)
+
+    missing_keys = [key for key in CHECKPOINT_MODEL_ARG_KEYS if key not in checkpoint_args_dict]
+    print(f'Loaded model args from: {args_path}')
+    print(f'Overrode model args: {", ".join(loaded_keys)}')
+    if missing_keys:
+        print(f'Model args missing in checkpoint args.pkl, kept evolution defaults: {", ".join(missing_keys)}')
+
+    return args_path, loaded_keys
+
 
 def train_one_epoch(args, evo_model, reward_model, reference_model, optimizer, epoch, total_epoch,
                     train_dataset, collate_fn, loss_history, device):
@@ -97,7 +152,7 @@ def train_one_epoch(args, evo_model, reward_model, reference_model, optimizer, e
     # 2. mutate to generate files for the limited possible combination
     loss_history.write(f'\nEpoch{epoch}: 2. Mutation\n')
 
-    mutate_info_list = mutate_info_list[0:5]  # TODO: debug only
+    # mutate_info_list = mutate_info_list[0:5]  # TODO: debug only
     train_dataset.mutate_pdb(mutate_info_list)
 
     loss_history.write(f'\nEpoch{epoch}: 2. Finish mutation\n')
@@ -226,6 +281,7 @@ def train_one_epoch(args, evo_model, reward_model, reference_model, optimizer, e
 if __name__ == '__main__':
     # ----------------------- environment setting ----------------------- #
     args = get_evolution_args()
+    checkpoint_args_path, checkpoint_model_arg_keys = load_model_args_from_checkpoint(args)
     print(args)
     
     seed = args.seed
@@ -243,11 +299,11 @@ if __name__ == '__main__':
     # ----------------------- Iteratively evo antibodies ----------------------- #
     train_path = 'data/sabdab/sabdab_evo.csv'
     train_df = pd.read_csv(train_path, dtype={"pdb_id": "string"})
-    wt_dir = '/home/lfj/projects_dir/MERF/data/sabdab/PDBs'
-    fix_dir = '/home/lfj/projects_dir/MERF/data/sabdab/PDBs_fixed'
-    mut_dir = '/home/lfj/projects_dir/MERF/data/sabdab/PDBs_evo'
-    plm_embedding_path = '/home/lfj/projects_dir/MERF/data/sabdab/PLM_embeddings_sabdab.pkl'
-    
+    wt_dir = '/home/dataset-local/projects_dir/MERF/data/sabdab/PDBs'
+    fix_dir = '/home/dataset-local/projects_dir/MERF/data/sabdab/PDBs_fixed'
+    mut_dir = '/home/dataset-local/projects_dir/MERF/data/sabdab/PDBs_evo'
+    plm_embedding_path = '/home/dataset-local/projects_dir/MERF/data/sabdab/PLM_embeddings_sabdab.pkl'
+
     for i in range(len(train_df)):
 
         # Data info and dataset
@@ -278,10 +334,13 @@ if __name__ == '__main__':
         this_loss_dir = loss_dir + pdb_id + '/'
         loss_history = LossHistory(this_loss_dir, is_evolve=True)
         loss_history.write(str(args) + '\n')
+        if checkpoint_args_path is not None:
+            loss_history.write(f'Loaded model args from {checkpoint_args_path}\n')
+            loss_history.write(f'Overrode model args: {", ".join(checkpoint_model_arg_keys)}\n')
 
         # ----------------------- Initial Networks ----------------------- #
         evo_model = MERF(args).to(device)
-        evo_model.load_state_dict(torch.load(args.model_load_path, map_location=device))  # TODO: add this back
+        evo_model.load_state_dict(torch.load(args.model_load_path, map_location=device))
 
         optimizer = optim.Adam(evo_model.parameters(), lr=args.lr, weight_decay=0.1)
 
@@ -290,7 +349,7 @@ if __name__ == '__main__':
         reference_model.eval()
 
         reward_model = MERF(args).to(device)
-        reward_model.load_state_dict(torch.load(args.model_load_path, map_location=device))  # TODO: add this back
+        reward_model.load_state_dict(torch.load(args.model_load_path, map_location=device))
         reward_model.eval()
 
         loss_history.write(f'\nLoading model from {args.model_load_path}\n')

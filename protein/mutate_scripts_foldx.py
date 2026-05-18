@@ -15,7 +15,7 @@ def Repair_wt(pdb_id, wt_path, fix_path):
 
     os.chdir(workdir)
 
-    command = f"foldx_20251231 --command=RepairPDB --pdb={pdb_id}.pdb"
+    command = f"foldx_20270131 --command=RepairPDB --pdb={pdb_id}.pdb"
     os.system(command)
 
     os.system('mv ' + pdb_id + '_Repair.pdb ' + fix_path)
@@ -37,7 +37,7 @@ def Gen_mut(pdb_id, fix_path, mutate_info, mut_path):
     with open(mutate_file, 'w') as f:
         f.write(mutate_info + ';\n')
     
-    command = f"foldx_20251231 --command=BuildModel --pdb={pdb_id}.pdb --mutant-file={mutate_file}"
+    command = f"foldx_20270131 --command=BuildModel --pdb={pdb_id}.pdb --mutant-file={mutate_file}"
     os.system(command)
 
     os.system('mv ' + pdb_id + '_1.pdb ' + mut_path)

@@ -4,8 +4,8 @@ def get_pretrain_args():
     parser = argparse.ArgumentParser()
 
     # ----------------------- the environment settings ----------------------- #
-    parser.add_argument('--seed', type=int, default=172, help='random seed')
-    # parser.add_argument('--seed', type=int, default=170, help='random seed')
+    # parser.add_argument('--seed', type=int, default=172, help='random seed')
+    parser.add_argument('--seed', type=int, default=170, help='random seed')
     parser.add_argument('--batch_size', type=int, default=64, help='batch size for training')
     parser.add_argument('--lr', type=float, default=1e-4, help='the initial learning rate')
     parser.add_argument('--is_cuda', type=bool, default=True, help='whether to use cuda')
@@ -22,13 +22,15 @@ def get_pretrain_args():
     parser.add_argument('--use_plm_embedding', type=bool, default=True, help='whether to use plm embedding as extra feature')
     parser.add_argument('--plm_path', type=str, default="/home/dataset-local/projects_dir/pretrained_model/models--facebook--esm2_t33_650M_UR50D/", help='the name of pre-trained language model')
     parser.add_argument('--use_weighted_sampling', type=bool, default=True, help='whether to use weighted sampling for balanced training')
-    parser.add_argument('--vm_sampling_weight', type=float, default=15.0, help='relative sampling weight for VM dataset')
+    # parser.add_argument('--vm_sampling_weight', type=float, default=15.0, help='relative sampling weight for VM dataset')
+    parser.add_argument('--vm_sampling_weight', type=float, default=2.0, help='relative sampling weight for VM dataset')
     parser.add_argument('--sk_sampling_weight', type=float, default=1.0, help='relative sampling weight for SKEMPIv2 dataset')
     parser.add_argument('--max_repetition_factor', type=float, default=2.0, help='max repetition factor for smaller dataset (0 means no limit)')
 
     # ----------------------- KL distribution loss settings ----------------------- #
     parser.add_argument('--use_kl_loss', type=bool, default=True, help='whether to use KL divergence loss for site mutation distribution')
-    parser.add_argument('--kl_loss_weight', type=float, default=3.5, help='weight for KL divergence loss')
+    # parser.add_argument('--kl_loss_weight', type=float, default=3.5, help='weight for KL divergence loss')
+    parser.add_argument('--kl_loss_weight', type=float, default=8.0, help='weight for KL divergence loss')
 
     # ----------------------- Ranking loss settings (v2) ----------------------- #
     parser.add_argument('--use_rank_loss', type=bool, default=True, help='whether to use pairwise RankNet loss for site mutation ranking')
@@ -98,7 +100,7 @@ def get_evolution_args():
     parser.add_argument('--knn_neighbors_num', type=int, default=128, help='number of neighbors for feature extraction')
     parser.add_argument('--knn_agents_num', type=int, default=20, help='number of neighbors for policy making')
 
-    parser.add_argument('--model_load_path', type=str, default='model/MERF_pretrained.pth', help='pretrained model path')
+    parser.add_argument('--model_load_path', type=str, default='/home/dataset-local/projects_dir/MERF/logs/pretrain_vm/2026_05_07_20_57_23/Epoch200_MERF.pth', help='pretrained model path')
 
     # global mutational effects estimation module
     parser.add_argument('--obs_shape', type=int, default=128, help='obs_shape')
