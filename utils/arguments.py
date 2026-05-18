@@ -123,6 +123,7 @@ def get_evolution_args():
     parser.add_argument('--inner_epochs', type=int, default=5, help='inner epochs for GRPO')
     parser.add_argument('--inner_batch_size', type=int, default=64, help='inner batch size for GRPO')
     parser.add_argument('--kl_coeff', type=float, default=0.5, help='KL divergence coefficient')
+    parser.add_argument('--cr_row_idx', type=int, default=0, help='row index in data/CR/cr_evo.csv for CR evolution')
 
     args = parser.parse_args()
     return args

@@ -44,6 +44,7 @@ class EvoBaseDataset(Dataset):
     
     def __getitem__(self, index):
         PDB_wt_file_path = os.path.join(self.wt_dir, f"{self.pdb_id}.pdb")
+        # PDB_wt_file_path = os.path.join(self.fix_dir, f"{self.pdb_id}.pdb")
         complex_wt_info = parse_pdb(PDB_wt_file_path)
 
         transform = KnnResidue(num_neighbors=self.knn_num)
