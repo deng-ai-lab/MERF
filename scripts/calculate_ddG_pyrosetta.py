@@ -254,13 +254,13 @@ def calculate_ddG(wt_pdb, mut_pdb, interface_str, output_dir, relax_wt=True, rel
     return results
 
 def main():
-    wt_path = "/home/lfj/projects_dir/MERF/data/7FAE/PDBs_fixed/7FAE.pdb"
-    mut_path = "/home/lfj/projects_dir/MERF/data/7FAE/PDBs_mutated/7FAE_AH53G.pdb"
+    wt_path = "/home/dataset-local/projects_dir/MERF/data/7FAE/PDBs_fixed/7FAE.pdb"
+    mut_path = "/home/dataset-local/projects_dir/MERF/data/7FAE/PDBs_mutated/7FAE_AH53G.pdb"
     partner = "HL_A"
-    output_dir = "/home/lfj/projects_dir/MERF/scripts/docking_test/"
+    output_dir = "/home/dataset-local/projects_dir/MERF/scripts/docking_test/"
 
     results = calculate_ddG(wt_path, mut_path, partner, output_dir)
-    # print(results)
+    print(results)
 
 if __name__ == '__main__':
     main()

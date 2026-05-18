@@ -13,6 +13,7 @@ from itertools import combinations
 import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter
 
 from model.MERF import MERF
 
@@ -84,7 +85,7 @@ def load_model_args_from_checkpoint(args):
 
 
 def train_one_epoch(args, evo_model, reward_model, reference_model, optimizer, epoch, total_epoch,
-                    train_dataset, collate_fn, loss_history, device):
+                    train_dataset, collate_fn, loss_history, device, tb_writer=None):
 
     print("Start Train")
     loss_history.write(f'\nEpoch{epoch}: Start Train\n')
@@ -176,6 +177,8 @@ def train_one_epoch(args, evo_model, reward_model, reference_model, optimizer, e
         loss_history.write(mutate_info + '\t' + str(q_tot_wt.item()) + '\n')
     
     loss_history.write(f'\nEpoch{epoch}: 3. Finish Scoring\n')
+    if tb_writer is not None:
+        tb_writer.add_scalar('evo/num_candidates', len(score_list), epoch)
 
     # 4. using GRPO to train the evo_model
 
@@ -236,12 +239,29 @@ def train_one_epoch(args, evo_model, reward_model, reference_model, optimizer, e
         optimizer.step()
 
         epoch_losses.append(batch_loss.item())
+        if tb_writer is not None:
+            inner_step = epoch * args.inner_epochs + inner_epoch
+            tb_writer.add_scalar('train/policy_loss', policy_loss.item(), inner_step)
+            tb_writer.add_scalar('train/kl_div', kl_div.item(), inner_step)
+            tb_writer.add_scalar('train/batch_loss', batch_loss.item(), inner_step)
         loss_history.write(f'  Inner epoch {inner_epoch}: avg_batch_loss={batch_loss.item():.6f}\n')
 
     loss = np.mean(epoch_losses)
 
     best_score = np.min(score_array)
     avg_score = np.mean(score_array)
+    std_score = np.std(score_array)
+    max_score = np.max(score_array)
+
+    if tb_writer is not None:
+        tb_writer.add_scalar('reward_model/best_score', best_score, epoch)
+        tb_writer.add_scalar('reward_model/avg_score', avg_score, epoch)
+        tb_writer.add_scalar('reward_model/std_score', std_score, epoch)
+        tb_writer.add_scalar('reward_model/worst_score', max_score, epoch)
+        tb_writer.add_scalar('eval/best_score', best_score, epoch)
+        tb_writer.add_scalar('eval/avg_score', avg_score, epoch)
+        tb_writer.add_scalar('train/loss', loss, epoch)
+        tb_writer.add_histogram('reward_model/scores', score_array, epoch)
 
     loss_history.write(f'Epoch{epoch}: Best Score={best_score:.6f}, Avg Score={avg_score:.6f}, Loss={loss:.6f}\n')
 
@@ -304,7 +324,15 @@ if __name__ == '__main__':
     mut_dir = '/home/dataset-local/projects_dir/MERF/data/sabdab/PDBs_evo'
     plm_embedding_path = '/home/dataset-local/projects_dir/MERF/data/sabdab/PLM_embeddings_sabdab.pkl'
 
-    for i in range(len(train_df)):
+    if args.dataset_idx is not None:
+        if args.dataset_idx < 0 or args.dataset_idx >= len(train_df):
+            raise IndexError(f'dataset_idx {args.dataset_idx} is out of range for {train_path} with {len(train_df)} rows')
+        dataset_indices = [args.dataset_idx]
+        print(f'Only evolving dataset row {args.dataset_idx}.')
+    else:
+        dataset_indices = range(len(train_df))
+
+    for i in dataset_indices:
 
         # Data info and dataset
         pdb_id = train_df['pdb_id'].iloc[i].replace('+', '').replace('.00', '')
@@ -333,31 +361,44 @@ if __name__ == '__main__':
         # ----------------------- Loss History ----------------------- #
         this_loss_dir = loss_dir + pdb_id + '/'
         loss_history = LossHistory(this_loss_dir, is_evolve=True)
+        tb_writer = SummaryWriter(log_dir=this_loss_dir)
         loss_history.write(str(args) + '\n')
         if checkpoint_args_path is not None:
             loss_history.write(f'Loaded model args from {checkpoint_args_path}\n')
             loss_history.write(f'Overrode model args: {", ".join(checkpoint_model_arg_keys)}\n')
 
-        # ----------------------- Initial Networks ----------------------- #
-        evo_model = MERF(args).to(device)
-        evo_model.load_state_dict(torch.load(args.model_load_path, map_location=device))
+        try:
+            tb_writer.add_text('run/args', str(args), 0)
+            if checkpoint_args_path is not None:
+                tb_writer.add_text('run/checkpoint_args_path', checkpoint_args_path, 0)
+                tb_writer.add_text('run/overrode_model_args', ', '.join(checkpoint_model_arg_keys), 0)
+            tb_writer.add_text('data/pdb_id', pdb_id, 0)
+            tb_writer.add_text('data/cdrh3', cdr, 0)
+            tb_writer.add_scalar('data/dataset_idx', i, 0)
 
-        optimizer = optim.Adam(evo_model.parameters(), lr=args.lr, weight_decay=0.1)
+            # ----------------------- Initial Networks ----------------------- #
+            evo_model = MERF(args).to(device)
+            evo_model.load_state_dict(torch.load(args.model_load_path, map_location=device))
 
-        reference_model = MERF(args).to(device)
-        reference_model.load_state_dict(evo_model.state_dict())
-        reference_model.eval()
+            optimizer = optim.Adam(evo_model.parameters(), lr=args.lr, weight_decay=0.1)
 
-        reward_model = MERF(args).to(device)
-        reward_model.load_state_dict(torch.load(args.model_load_path, map_location=device))
-        reward_model.eval()
+            reference_model = MERF(args).to(device)
+            reference_model.load_state_dict(evo_model.state_dict())
+            reference_model.eval()
 
-        loss_history.write(f'\nLoading model from {args.model_load_path}\n')
+            reward_model = MERF(args).to(device)
+            reward_model.load_state_dict(torch.load(args.model_load_path, map_location=device))
+            reward_model.eval()
 
-        # ----------------------- fit one epoch ----------------------- #
-        total_epoch = 3000
-        for epoch in range(total_epoch):
-            wt_energy = train_one_epoch(
-                args, evo_model, reward_model, reference_model, optimizer, epoch, total_epoch,
-                train_dataset, collate_fn, loss_history, device
-            )
+            loss_history.write(f'\nLoading model from {args.model_load_path}\n')
+
+            # ----------------------- fit one epoch ----------------------- #
+            total_epoch = 3000
+            for epoch in range(total_epoch):
+                wt_energy = train_one_epoch(
+                    args, evo_model, reward_model, reference_model, optimizer, epoch, total_epoch,
+                    train_dataset, collate_fn, loss_history, device, tb_writer=tb_writer
+                )
+        finally:
+            tb_writer.flush()
+            tb_writer.close()
