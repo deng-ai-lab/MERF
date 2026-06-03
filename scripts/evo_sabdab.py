@@ -30,6 +30,9 @@ cpu_num = 32
 torch.set_num_threads(cpu_num)
 print(cpu_num)
 
+PYROSETTA_TOP_K = 30
+_PYROSETTA_INITIALIZED = False
+
 CHECKPOINT_MODEL_ARG_KEYS = (
     'use_plm_embedding',
     'plm_path',
@@ -82,6 +85,116 @@ def load_model_args_from_checkpoint(args):
         print(f'Model args missing in checkpoint args.pkl, kept evolution defaults: {", ".join(missing_keys)}')
 
     return args_path, loaded_keys
+
+
+def update_candidate_scores(best_candidate_scores, epoch_candidate_scores):
+    for candidate in epoch_candidate_scores:
+        mutate_info = candidate['mutate_info']
+        prev_candidate = best_candidate_scores.get(mutate_info)
+        if prev_candidate is None or candidate['reward_score'] < prev_candidate['reward_score']:
+            best_candidate_scores[mutate_info] = candidate
+
+
+def get_top_reward_candidates(best_candidate_scores, top_k=PYROSETTA_TOP_K):
+    candidates = list(best_candidate_scores.values())
+    candidates.sort(key=lambda item: item['reward_score'])
+    return candidates[:top_k]
+
+
+def _safe_name(text):
+    return text.replace(',', '_').replace('/', '_').replace('\\', '_')
+
+
+def evaluate_top_candidates_with_pyrosetta(
+        pdb_id, interface_str, wt_dir, fix_dir, mut_dir, best_candidate_scores,
+        output_dir, loss_history, tb_writer=None, top_k=PYROSETTA_TOP_K):
+    global _PYROSETTA_INITIALIZED
+
+    top_candidates = get_top_reward_candidates(best_candidate_scores, top_k=top_k)
+    if len(top_candidates) == 0:
+        loss_history.write('\nPyRosetta ddG skipped: no reward-model candidates were generated.\n')
+        return pd.DataFrame()
+
+    from scripts.calculate_ddG_pyrosetta import init_pyrosetta, relax_structure, calculate_interface_energy
+
+    if not _PYROSETTA_INITIALIZED:
+        init_pyrosetta()
+        _PYROSETTA_INITIALIZED = True
+
+    pyrosetta_dir = os.path.join(output_dir, 'pyrosetta_ddg')
+    os.makedirs(pyrosetta_dir, exist_ok=True)
+
+    wt_pdb = os.path.join(fix_dir, f"{pdb_id}.pdb")
+    if not os.path.exists(wt_pdb):
+        wt_pdb = os.path.join(wt_dir, f"{pdb_id}.pdb")
+
+    wt_relaxed_pdb = os.path.join(pyrosetta_dir, 'wt_relaxed.pdb')
+    loss_history.write(f'\nPyRosetta ddG: relaxing WT {wt_pdb}\n')
+    try:
+        relax_structure(wt_pdb, wt_relaxed_pdb)
+        wt_energy_pdb = wt_relaxed_pdb
+        wt_relaxed = True
+    except Exception as e:
+        loss_history.write(f'PyRosetta ddG: failed to relax WT, using original WT. Error: {e}\n')
+        wt_energy_pdb = wt_pdb
+        wt_relaxed = False
+
+    dG_wt = calculate_interface_energy(wt_energy_pdb, interface_str)
+    results = []
+
+    for rank, candidate in enumerate(top_candidates, start=1):
+        mutate_info = candidate['mutate_info']
+        reward_score = candidate['reward_score']
+        epoch = candidate['epoch']
+        mut_pdb = os.path.join(mut_dir, f"{pdb_id}_{mutate_info}.pdb")
+        candidate_dir = os.path.join(pyrosetta_dir, f"rank_{rank:03d}_{_safe_name(mutate_info)}")
+        os.makedirs(candidate_dir, exist_ok=True)
+        mut_relaxed_pdb = os.path.join(candidate_dir, 'mut_relaxed.pdb')
+
+        row = {
+            'rank_by_reward_model': rank,
+            'epoch': epoch,
+            'mutate_info': mutate_info,
+            'reward_score': reward_score,
+            'wt_pdb': os.path.abspath(wt_pdb),
+            'mut_pdb': os.path.abspath(mut_pdb),
+            'interface': interface_str,
+            'wt_relaxed': wt_relaxed,
+            'mut_relaxed': False,
+            'dG_wt': float(dG_wt),
+            'dG_mut': np.nan,
+            'ddG': np.nan,
+            'error': '',
+        }
+
+        try:
+            loss_history.write(f'PyRosetta ddG rank {rank}: {mutate_info}, reward_score={reward_score:.6f}\n')
+            relax_structure(mut_pdb, mut_relaxed_pdb)
+            row['mut_relaxed'] = True
+            dG_mut = calculate_interface_energy(mut_relaxed_pdb, interface_str)
+            row['dG_mut'] = float(dG_mut)
+            row['ddG'] = float(dG_mut - dG_wt)
+        except Exception as e:
+            row['error'] = str(e)
+            loss_history.write(f'PyRosetta ddG rank {rank} failed: {mutate_info}. Error: {e}\n')
+
+        results.append(row)
+
+    result_df = pd.DataFrame(results)
+    result_path = os.path.join(pyrosetta_dir, f'{pdb_id}_top{top_k}_pyrosetta_ddg.csv')
+    result_df.to_csv(result_path, index=False)
+    loss_history.write(f'PyRosetta ddG results saved to {result_path}\n')
+
+    valid_ddg = result_df['ddG'].dropna()
+    if tb_writer is not None:
+        tb_writer.add_scalar('pyrosetta_ddg/num_evaluated', len(result_df), 0)
+        tb_writer.add_scalar('pyrosetta_ddg/num_success', len(valid_ddg), 0)
+        if len(valid_ddg) > 0:
+            tb_writer.add_scalar('pyrosetta_ddg/best_ddG', valid_ddg.min(), 0)
+            tb_writer.add_scalar('pyrosetta_ddg/avg_ddG', valid_ddg.mean(), 0)
+            tb_writer.add_histogram('pyrosetta_ddg/ddG', valid_ddg.to_numpy(), 0)
+
+    return result_df
 
 
 def train_one_epoch(args, evo_model, reward_model, reference_model, optimizer, epoch, total_epoch,
@@ -295,7 +408,17 @@ def train_one_epoch(args, evo_model, reward_model, reference_model, optimizer, e
         save_df = pd.concat([save_df, new_row], ignore_index=True)
         save_df.to_csv(save_file, index=False)
 
-    return best_score
+    epoch_candidate_scores = [
+        {'epoch': epoch, 'mutate_info': mutate_info, 'reward_score': score}
+        for mutate_info, score in zip(mutate_info_list, score_list)
+    ]
+
+    return {
+        'best_score': best_score,
+        'avg_score': avg_score,
+        'train_loss': loss,
+        'candidate_scores': epoch_candidate_scores,
+    }
 
 
 if __name__ == '__main__':
@@ -394,11 +517,18 @@ if __name__ == '__main__':
 
             # ----------------------- fit one epoch ----------------------- #
             total_epoch = 3000
+            best_candidate_scores = {}
             for epoch in range(total_epoch):
-                wt_energy = train_one_epoch(
+                epoch_metrics = train_one_epoch(
                     args, evo_model, reward_model, reference_model, optimizer, epoch, total_epoch,
                     train_dataset, collate_fn, loss_history, device, tb_writer=tb_writer
                 )
+                update_candidate_scores(best_candidate_scores, epoch_metrics['candidate_scores'])
+
+            evaluate_top_candidates_with_pyrosetta(
+                pdb_id, partner, wt_dir, fix_dir, mut_dir, best_candidate_scores,
+                this_loss_dir, loss_history, tb_writer=tb_writer, top_k=PYROSETTA_TOP_K
+            )
         finally:
             tb_writer.flush()
             tb_writer.close()

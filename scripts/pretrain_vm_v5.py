@@ -11,7 +11,7 @@ import torch.optim as optim
 from torch.optim.lr_scheduler import CosineAnnealingLR, SequentialLR, LinearLR
 from torch.utils.data import DataLoader
 
-from model.MERF import MERF
+from model.MERF_v6 import MERF
 
 from dataset.dataset_ddg_v5 import VMDataset, VMSiteDataset, DDGBaseDataset, CRDataset
 from utils.arguments import get_pretrain_args

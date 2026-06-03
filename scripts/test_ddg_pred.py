@@ -257,11 +257,11 @@ def main():
 
     # Add test-specific arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument('--log_dir', type=str, default="/home/dataset-local/projects_dir/MERF/logs/pretrain_vm/2026_04_21_20_47_11",
+    parser.add_argument('--log_dir', type=str, default="/home/dataset-local/projects_dir/MERF/logs/pretrain_vm/2026_05_28_23_53_09",
                        help='Path to log directory (e.g., logs/pretrain_vm/2025_11_22_00_40_23)')
     parser.add_argument('--test_datasets', type=str, default='cr_6261_h1',
                        help='Comma-separated list of datasets to test (e.g., vm,abbind,cr_6261_h1,7fae)')
-    parser.add_argument('--checkpoint_epoch', type=int, default=100,
+    parser.add_argument('--checkpoint_epoch', type=int, default=200,
                        help='Epoch number to test (default: use last epoch based on Epoch*_MERF.pth files)')
     parser.add_argument('--gpu_idx', type=int, default=3,
                        help='GPU index to use (default: use value from training args)')

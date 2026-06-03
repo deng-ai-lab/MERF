@@ -5,13 +5,14 @@ def get_pretrain_args():
 
     # ----------------------- the environment settings ----------------------- #
     # parser.add_argument('--seed', type=int, default=172, help='random seed')
-    parser.add_argument('--seed', type=int, default=170, help='random seed')
+    parser.add_argument('--seed', type=int, default=290, help='random seed')
     parser.add_argument('--batch_size', type=int, default=64, help='batch size for training')
     parser.add_argument('--lr', type=float, default=1e-4, help='the initial learning rate')
     parser.add_argument('--is_cuda', type=bool, default=True, help='whether to use cuda')
-    parser.add_argument('--gpu_idx', type=int, default=0, help='gpu_idx')
+    parser.add_argument('--gpu_idx', type=int, default=2, help='gpu_idx')
     parser.add_argument('--num_works', type=int, default=16, help='works for loading data')
     parser.add_argument('--n_epoch', type=int, default=200, help='the number of epoch for training')
+    # parser.add_argument('--n_epoch', type=int, default=600, help='the number of epoch for training')
 
     # ----------------------- learning rate scheduler settings ----------------------- #
     parser.add_argument('--use_cosine_lr', type=bool, default=True, help='whether to use cosine annealing learning rate scheduler')
@@ -23,7 +24,7 @@ def get_pretrain_args():
     parser.add_argument('--plm_path', type=str, default="/home/dataset-local/projects_dir/pretrained_model/models--facebook--esm2_t33_650M_UR50D/", help='the name of pre-trained language model')
     parser.add_argument('--use_weighted_sampling', type=bool, default=True, help='whether to use weighted sampling for balanced training')
     parser.add_argument('--vm_sampling_weight', type=float, default=15.0, help='relative sampling weight for VM dataset')
-    # parser.add_argument('--vm_sampling_weight', type=float, default=2.0, help='relative sampling weight for VM dataset')
+    # parser.add_argument('--vm_sampling_weight', type=float, default=4.0, help='relative sampling weight for VM dataset')
     parser.add_argument('--sk_sampling_weight', type=float, default=1.0, help='relative sampling weight for SKEMPIv2 dataset')
     parser.add_argument('--max_repetition_factor', type=float, default=2.0, help='max repetition factor for smaller dataset (0 means no limit)')
 
