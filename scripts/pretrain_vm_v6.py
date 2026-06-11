@@ -81,7 +81,9 @@ def train_one_epoch(model, optimizer, epoch, n_epoch, epoch_size_train, train_lo
 
 
 def periodic_val(model, val_vm_loader, val_ab_loader, epoch, device, writer=None,
-                 cr_6261_h1_loader=None, cr_6261_h9_loader=None, fae7_loader=None):
+                 cr_6261_h1_loader=None, cr_6261_h9_loader=None,
+                 cr_9114_h1_loader=None, cr_9114_h3_loader=None,
+                 fae7_loader=None):
     """Run full per-sample validation on both val sets, print and log pearsonr + rmse."""
     model.eval()
     print(f'\n--- Periodic Validation (Epoch {epoch + 1}) ---')
@@ -96,7 +98,8 @@ def periodic_val(model, val_vm_loader, val_ab_loader, epoch, device, writer=None
             writer.add_scalar(f'PeriodicVal/{tag}_rmse', rmse, epoch)
 
     # CR datasets: spearman-r and pearson-r only
-    for tag, loader in [('CR_6261_H1', cr_6261_h1_loader), ('CR_6261_H9', cr_6261_h9_loader)]:
+    for tag, loader in [('CR_6261_H1', cr_6261_h1_loader), ('CR_6261_H9', cr_6261_h9_loader),
+                        ('CR_9114_H1', cr_9114_h1_loader), ('CR_9114_H3', cr_9114_h3_loader)]:
         if loader is None:
             continue
         results = val(model, loader, device)
@@ -325,6 +328,22 @@ if __name__ == '__main__':
         plm_embedding_path='/home/dataset-local/projects_dir/MERF/data/CR/cr6261_h9_esm2_650_embeddings.pkl',
         device=device, target_column='h9_score'
     )
+    val_cr_9114_h1_dataset = CRDataset(
+        '/home/dataset-local/projects_dir/MERF/data/CR/cr9114_h1.csv',
+        cr_base_wt_dir, cr_base_mut_dir,
+        knn_num=args.knn_neighbors_num, knn_agents_num=args.knn_agents_num,
+        use_plm_embedding=args.use_plm_embedding, plm_path=args.plm_path,
+        plm_embedding_path='/home/dataset-local/projects_dir/MERF/data/CR/cr9114_h1_esm2_650_embeddings.pkl',
+        device=device, target_column='h1_score'
+    )
+    val_cr_9114_h3_dataset = CRDataset(
+        '/home/dataset-local/projects_dir/MERF/data/CR/cr9114_h3.csv',
+        cr_base_wt_dir, cr_base_mut_dir,
+        knn_num=args.knn_neighbors_num, knn_agents_num=args.knn_agents_num,
+        use_plm_embedding=args.use_plm_embedding, plm_path=args.plm_path,
+        plm_embedding_path='/home/dataset-local/projects_dir/MERF/data/CR/cr9114_h3_esm2_650_embeddings.pkl',
+        device=device, target_column='h3_score'
+    )
     val_7fae_dataset = DDGBaseDataset(
         '/home/dataset-local/projects_dir/MERF/data/7FAE/7FAE.csv',
         '/home/dataset-local/projects_dir/MERF/data/7FAE/PDBs_fixed',
@@ -339,6 +358,10 @@ if __name__ == '__main__':
                                drop_last=False, num_workers=args.num_works, collate_fn=collate_fn)
     gen_val_cr_h9 = DataLoader(val_cr_h9_dataset, shuffle=False, batch_size=args.batch_size, pin_memory=False,
                                drop_last=False, num_workers=args.num_works, collate_fn=collate_fn)
+    gen_val_cr_9114_h1 = DataLoader(val_cr_9114_h1_dataset, shuffle=False, batch_size=args.batch_size, pin_memory=False,
+                                    drop_last=False, num_workers=args.num_works, collate_fn=collate_fn)
+    gen_val_cr_9114_h3 = DataLoader(val_cr_9114_h3_dataset, shuffle=False, batch_size=args.batch_size, pin_memory=False,
+                                    drop_last=False, num_workers=args.num_works, collate_fn=collate_fn)
     gen_val_7fae = DataLoader(val_7fae_dataset, shuffle=False, batch_size=args.batch_size, pin_memory=False,
                               drop_last=False, num_workers=args.num_works, collate_fn=collate_fn)
 
@@ -389,9 +412,11 @@ if __name__ == '__main__':
     for epoch in range(args.n_epoch):
         train_one_epoch(model, optimizer, epoch, args.n_epoch, epoch_size_train, gen_train, device, use_kl_loss=args.use_kl_loss, writer=writer)
 
-        if (epoch + 1) % 10 == 0:
+        # if (epoch + 1) % 10 == 0:
+        if (epoch + 1) % 25 == 0:
             periodic_val(model, gen_val_vm, gen_val_ab, epoch, device, writer=writer,
                          cr_6261_h1_loader=gen_val_cr_h1, cr_6261_h9_loader=gen_val_cr_h9,
+                         cr_9114_h1_loader=gen_val_cr_9114_h1, cr_9114_h3_loader=gen_val_cr_9114_h3,
                          fae7_loader=gen_val_7fae)
 
         # Update learning rate scheduler

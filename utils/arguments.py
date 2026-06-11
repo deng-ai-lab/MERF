@@ -5,11 +5,11 @@ def get_pretrain_args():
 
     # ----------------------- the environment settings ----------------------- #
     # parser.add_argument('--seed', type=int, default=172, help='random seed')
-    parser.add_argument('--seed', type=int, default=290, help='random seed')
+    parser.add_argument('--seed', type=int, default=314, help='random seed')
     parser.add_argument('--batch_size', type=int, default=64, help='batch size for training')
     parser.add_argument('--lr', type=float, default=1e-4, help='the initial learning rate')
     parser.add_argument('--is_cuda', type=bool, default=True, help='whether to use cuda')
-    parser.add_argument('--gpu_idx', type=int, default=2, help='gpu_idx')
+    parser.add_argument('--gpu_idx', type=int, default=3, help='gpu_idx')
     parser.add_argument('--num_works', type=int, default=16, help='works for loading data')
     parser.add_argument('--n_epoch', type=int, default=200, help='the number of epoch for training')
     # parser.add_argument('--n_epoch', type=int, default=600, help='the number of epoch for training')
