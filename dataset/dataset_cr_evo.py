@@ -227,9 +227,9 @@ class CREvoDataset(Dataset):
         for reverse_key in self.candidate_reverse_keys:
             reverse_set = set(self._split_key(reverse_key))
             action_rows.append([
-                0 if mutation in reverse_set else 1
+                0 if mutation in reverse_set else 1  # 对每一个reverse_mutation，应该记录它现在的状态
                 for mutation in self.reverse_mutations
-            ])  # 1代表在这个候选突变组合中，这个位点的氨基酸是成熟抗体的氨基酸（forward mutation），0代表是非成熟抗体的氨基酸（reverse mutation）
+            ])  # 1代表在这个候选突变组合中，这个位点的氨基酸是成熟抗体的氨基酸（forward mutation），0代表是非成熟抗体的氨基酸（reverse mutation）。也就是说，未来的动作中，如果做出的动作符合1，那就是合理的
         self.candidate_action_matrix = torch.tensor(action_rows, dtype=torch.long)
 
         ranked = sorted(

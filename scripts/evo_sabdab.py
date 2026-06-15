@@ -15,7 +15,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
-from model.MERF import MERF
+from model.MERF_v6 import MERF
 
 from dataset.dataset_evo import EvoBaseDataset
 from utils.arguments import get_evolution_args
@@ -34,6 +34,7 @@ PYROSETTA_TOP_K = 30
 _PYROSETTA_INITIALIZED = False
 
 CHECKPOINT_MODEL_ARG_KEYS = (
+    'seed',
     'use_plm_embedding',
     'plm_path',
     'feat_dim',
@@ -385,8 +386,8 @@ def train_one_epoch(args, evo_model, reward_model, reference_model, optimizer, e
     print('Best Score: %.6f, Avg Score: %.6f, Train Loss: %.6f' % (best_score, avg_score, loss))
 
     print('Saving state, iter:', str(epoch + 1))
-    save_path = loss_history.save_path + 'Epoch%d_evo.pth' % ((epoch + 1))
-    torch.save(evo_model.state_dict(), save_path)
+    # save_path = loss_history.save_path + 'Epoch%d_evo.pth' % ((epoch + 1))
+    # torch.save(evo_model.state_dict(), save_path)
 
     save_file = os.path.join(loss_history.save_path, pdb_id + '.csv')
     if not os.path.exists(save_file):
@@ -441,6 +442,8 @@ if __name__ == '__main__':
     
     # ----------------------- Iteratively evo antibodies ----------------------- #
     train_path = 'data/sabdab/sabdab_evo.csv'
+    # train_path = 'data/sabdab/sabdab_evo_general_antibody.csv'
+    # train_path = 'data/sabdab/sabdab_evo_nanobody.csv'
     train_df = pd.read_csv(train_path, dtype={"pdb_id": "string"})
     wt_dir = '/home/dataset-local/projects_dir/MERF/data/sabdab/PDBs'
     fix_dir = '/home/dataset-local/projects_dir/MERF/data/sabdab/PDBs_fixed'

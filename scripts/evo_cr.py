@@ -14,7 +14,7 @@ from tqdm import tqdm
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from dataset.dataset_cr_evo import CREvoDataset
-from model.MERF import MERF
+from model.MERF_v6 import MERF
 from protein.read_pdbs import PaddingCollate
 from utils.arguments import get_evolution_args
 from utils.losshistory import LossHistory
@@ -26,6 +26,7 @@ torch.set_num_threads(cpu_num)
 print(cpu_num)
 
 CHECKPOINT_MODEL_ARG_KEYS = (
+    'seed',
     'use_plm_embedding',
     'plm_path',
     'feat_dim',
@@ -122,8 +123,9 @@ def train_one_epoch_cr(args, evo_model, reward_model, reference_model, optimizer
     model_score_value = float(model_score.item())
 
     if reward_baseline is None:
-        reward_baseline = model_score_value
-    advantage_value = reward_baseline - model_score_value
+        # reward_baseline = model_score_value
+        reward_baseline = 0
+    advantage_value = reward_baseline - model_score_value  # score都是越低越好，这里advantage取了负号，因此advantage是越高越好
     advantage = torch.tensor(advantage_value, dtype=torch.float32, device=device)
 
     old_model = MERF(args).to(device)
@@ -147,7 +149,7 @@ def train_one_epoch_cr(args, evo_model, reward_model, reference_model, optimizer
         curr_selected_log_prob = selected_mean_log_prob(curr_log_probs, selected_actions)
 
         ratio = torch.exp(curr_selected_log_prob - old_selected_log_prob).clamp(max=20.0)
-        policy_loss = -(ratio * advantage)
+        policy_loss = -(ratio * advantage)  # advantage是越高越好，所以loss加个负号，梯度下降时loss下降，也就会带动advantage上升
         kl_div = (ref_log_probs.exp() * (ref_log_probs - curr_log_probs)).sum(dim=-1).mean()
         batch_loss = policy_loss + args.kl_coeff * kl_div
 
@@ -161,7 +163,9 @@ def train_one_epoch_cr(args, evo_model, reward_model, reference_model, optimizer
             f'advantage={advantage_value:.6f}, kl={kl_div.item():.6f}\n'
         )
 
-    reward_baseline = 0.9 * reward_baseline + 0.1 * model_score_value
+    # reward_baseline = 0.9 * reward_baseline + 0.1 * model_score_value
+    reward_baseline = reward_baseline  # 0615 test
+
     eval_info = train_dataset.evaluate_reverse_key(reverse_key)
     true_rank = eval_info['rank']
     true_score = eval_info['true_score']
@@ -186,8 +190,9 @@ def train_one_epoch_cr(args, evo_model, reward_model, reference_model, optimizer
         % (model_score_value, str(true_rank), str(mean_rank), str(best_rank), train_loss)
     )
 
-    save_path = os.path.join(loss_history.save_path, 'Epoch%d_evo.pth' % (epoch + 1))
-    torch.save(evo_model.state_dict(), save_path)
+    # if epoch % 50 == 0:
+    #     save_path = os.path.join(loss_history.save_path, 'Epoch%d_evo.pth' % (epoch + 1))
+    #     torch.save(evo_model.state_dict(), save_path)
 
     metrics = {
         'epoch': epoch,
@@ -248,6 +253,7 @@ if __name__ == '__main__':
     curr_time = datetime.datetime.now()
     time_str = datetime.datetime.strftime(curr_time, '%Y_%m_%d_%H_%M_%S')
     loss_dir = loss_dir + time_str + '/'
+    print(f'Loss and model checkpoints will be saved to {loss_dir}')
 
     cr_dir = '/home/dataset-local/projects_dir/MERF/data/CR'
     train_path = os.path.join(cr_dir, 'cr_evo.csv')

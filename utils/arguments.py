@@ -83,7 +83,7 @@ def get_evolution_args():
     parser.add_argument('--batch_size', type=int, default=1, help='batch size for training')
     parser.add_argument('--lr', type=float, default=5e-5, help='the initial learning rate')
     parser.add_argument('--is_cuda', type=bool, default=True, help='whether to use cuda')
-    parser.add_argument('--gpu_idx', type=int, default=1, help='gpu_idx')
+    parser.add_argument('--gpu_idx', type=int, default=0, help='gpu_idx')
     parser.add_argument('--num_works', type=int, default=8, help='works for loading data')
     parser.add_argument('--n_epoch', type=int, default=30, help='the number of epoch for training')
 
@@ -101,7 +101,7 @@ def get_evolution_args():
     parser.add_argument('--knn_neighbors_num', type=int, default=128, help='number of neighbors for feature extraction')
     parser.add_argument('--knn_agents_num', type=int, default=20, help='number of neighbors for policy making')
 
-    parser.add_argument('--model_load_path', type=str, default='/home/dataset-local/projects_dir/MERF/logs/pretrain_vm/2026_05_07_20_57_23/Epoch200_MERF.pth', help='pretrained model path')
+    parser.add_argument('--model_load_path', type=str, default='/home/dataset-local/projects_dir/MERF/logs/pretrain_vm/2026_06_09_16_56_32/Epoch200_MERF.pth', help='pretrained model path')
 
     # global mutational effects estimation module
     parser.add_argument('--obs_shape', type=int, default=128, help='obs_shape')
@@ -118,14 +118,14 @@ def get_evolution_args():
 
     # ----------------------- evolution settings ----------------------- #
     parser.add_argument('--dataset_idx', type=int, default=None, help='row index in data/sabdab/sabdab_evo.csv for SAbDab evolution; evolve all rows if unset')
+    parser.add_argument('--cr_row_idx', type=int, default=0, help='row index in data/CR/cr_evo.csv for CR evolution')
     parser.add_argument('--comb_num', type=int, default=3, help='numbers of mutations')
     parser.add_argument('--training_times', type=int, default=5, help='times for updating using one batch data')
 
     # ----------------------- GRPO settings ----------------------- #
-    parser.add_argument('--inner_epochs', type=int, default=5, help='inner epochs for GRPO')
+    parser.add_argument('--inner_epochs', type=int, default=10, help='inner epochs for GRPO')
     parser.add_argument('--inner_batch_size', type=int, default=64, help='inner batch size for GRPO')
     parser.add_argument('--kl_coeff', type=float, default=0.5, help='KL divergence coefficient')
-    parser.add_argument('--cr_row_idx', type=int, default=0, help='row index in data/CR/cr_evo.csv for CR evolution')
-
+    
     args = parser.parse_args()
     return args
