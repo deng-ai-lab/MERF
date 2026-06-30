@@ -55,7 +55,7 @@ def get_evolution_args_v2():
 
     parser.add_argument('--seed', type=int, default=172, help='random seed')
     parser.add_argument('--batch_size', type=int, default=1, help='batch size for training')
-    parser.add_argument('--lr', type=float, default=5e-5, help='the initial learning rate')
+    parser.add_argument('--lr', type=float, default=1e-6, help='the initial learning rate')
     parser.add_argument('--is_cuda', type=bool, default=True, help='whether to use cuda')
     parser.add_argument('--gpu_idx', type=int, default=1, help='gpu_idx')
     parser.add_argument('--num_works', type=int, default=8, help='works for loading data')
@@ -96,7 +96,7 @@ def get_evolution_args_v2():
     parser.add_argument('--comb_num', type=int, default=3, help='numbers of mutations')
     parser.add_argument('--training_times', type=int, default=5, help='times for updating using one batch data')
 
-    parser.add_argument('--inner_epochs', type=int, default=10, help='inner epochs for PPO')
+    parser.add_argument('--inner_epochs', type=int, default=3, help='inner epochs for PPO')
     parser.add_argument('--inner_batch_size', type=int, default=64, help='kept for compatibility')
     parser.add_argument('--kl_coeff', type=float, default=0.5, help='KL divergence coefficient')
 
@@ -192,10 +192,14 @@ def score_projected_actions(train_dataset, collate_fn, reward_model, projected_a
 def summarize_projected_candidates(train_dataset, reverse_keys):
     true_scores = []
     ranks = []
+    mean_ranks = []
+    fallback_rank = max(train_dataset.rank_by_reverse_key.values()) + 1 if train_dataset.rank_by_reverse_key else 1
     for reverse_key in reverse_keys:
         eval_info = train_dataset.evaluate_reverse_key(reverse_key)
         true_scores.append(eval_info['true_score'])
-        ranks.append(eval_info['rank'])
+        rank = eval_info['rank']
+        ranks.append(rank)
+        mean_ranks.append(fallback_rank if rank is None or pd.isna(rank) else rank)
 
     valid_scores = [score for score in true_scores if score is not None and not pd.isna(score)]
     valid_ranks = [rank for rank in ranks if rank is not None and not pd.isna(rank)]
@@ -204,7 +208,7 @@ def summarize_projected_candidates(train_dataset, reverse_keys):
         'ranks': ranks,
         'best_true_score': float(np.max(valid_scores)) if valid_scores else np.nan,
         'best_rank': int(np.min(valid_ranks)) if valid_ranks else np.nan,
-        'mean_rank': float(np.mean(valid_ranks)) if valid_ranks else np.nan,
+        'mean_rank': float(np.mean(mean_ranks)) if mean_ranks else np.nan,
     }
 
 
@@ -348,6 +352,7 @@ def train_one_epoch_cr(args, evo_model, reward_model, reference_model, optimizer
         f'train_best_true_score={train_best_true_score}, train_best_rank={train_best_rank}, '
         f'sample_best_true_score={sample_summary["best_true_score"]}, '
         f'sample_best_rank={sample_summary["best_rank"]}, '
+        f'sample_mean_rank={sample_summary["mean_rank"]}, '
         f'greedy_reverse_key={greedy_reverse_key}, greedy_forward_info={greedy_forward_info}, '
         f'greedy_model_score={greedy_model_score}, greedy_true_score={greedy_true_score}, '
         f'greedy_rank={greedy_rank}, mean_eval_rank={mean_rank}, best_eval_rank={best_rank}, '
@@ -356,8 +361,16 @@ def train_one_epoch_cr(args, evo_model, reward_model, reference_model, optimizer
 
     print('Epoch:' + str(epoch + 1) + '/' + str(total_epoch))
     print(
-        'Sample Best Model Score: %.6f, Sample Best Rank: %s, Greedy Rank: %s, Train Loss: %.6f'
-        % (train_best_model_score, str(train_best_rank), str(greedy_rank), train_loss)
+        'Model-selected Sample Score: %.6f, Model-selected Rank: %s, '
+        'Sample Best Rank: %s, Sample Mean Rank: %s, Greedy Rank: %s, Train Loss: %.6f'
+        % (
+            train_best_model_score,
+            str(train_best_rank),
+            str(sample_summary['best_rank']),
+            str(sample_summary['mean_rank']),
+            str(greedy_rank),
+            train_loss,
+        )
     )
 
     # if epoch % 50 == 0:
@@ -410,6 +423,7 @@ def train_one_epoch_cr(args, evo_model, reward_model, reference_model, optimizer
         writer.add_scalar('Sample/best_model_score', train_best_model_score, epoch + 1)
         writer.add_scalar('Sample/best_true_score', sample_summary['best_true_score'], epoch + 1)
         writer.add_scalar('Sample/best_rank', sample_summary['best_rank'], epoch + 1)
+        writer.add_scalar('Sample/mean_rank', sample_summary['mean_rank'], epoch + 1)
         writer.add_scalar('Sample/unique_candidates', unique_candidates, epoch + 1)
         writer.add_scalar('Sample/model_score_mean', float(model_score_values.mean().item()), epoch + 1)
         writer.add_scalar('Sample/model_score_std', metrics['train_sample_model_score_std'], epoch + 1)
@@ -511,7 +525,7 @@ if __name__ == '__main__':
 
     evo_model = MERF(args).to(device)
     evo_model.load_state_dict(torch.load(args.model_load_path, map_location=device))
-    optimizer = optim.Adam(evo_model.parameters(), lr=args.lr, weight_decay=0.1)
+    optimizer = optim.Adam(evo_model.parameters(), lr=args.lr, weight_decay=1e-4)
 
     reference_model = MERF(args).to(device)
     reference_model.load_state_dict(evo_model.state_dict())
