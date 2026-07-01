@@ -7,6 +7,11 @@ CLAUDE.md
 .codex
 .vscode/
 protein/ANARCI/
+scripts/colabdesign_af2_output/
+side-tasks/cmet/pdbs/
+side-tasks/cmet/results/
+side-tasks/plectin1/pdbs/
+side-tasks/plectin1/results/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
