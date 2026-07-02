@@ -12,6 +12,8 @@ side-tasks/cmet/pdbs/
 side-tasks/cmet/results/
 side-tasks/plectin1/pdbs/
 side-tasks/plectin1/results/
+side-tasks/gromacs_test/
+hbplus_work/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

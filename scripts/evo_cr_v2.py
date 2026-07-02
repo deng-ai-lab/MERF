@@ -90,8 +90,8 @@ def get_evolution_args_v2():
     
     # parser.add_argument('--cr_row_idx', type=int, default=0, help='row index in data/CR/cr_evo.csv for CR evolution')
     # parser.add_argument('--cr_row_idx', type=int, default=1, help='row index in data/CR/cr_evo.csv for CR evolution')
-    parser.add_argument('--cr_row_idx', type=int, default=2, help='row index in data/CR/cr_evo.csv for CR evolution')
-    # parser.add_argument('--cr_row_idx', type=int, default=3, help='row index in data/CR/cr_evo.csv for CR evolution')
+    # parser.add_argument('--cr_row_idx', type=int, default=2, help='row index in data/CR/cr_evo.csv for CR evolution')
+    parser.add_argument('--cr_row_idx', type=int, default=3, help='row index in data/CR/cr_evo.csv for CR evolution')
 
     parser.add_argument('--comb_num', type=int, default=3, help='numbers of mutations')
     parser.add_argument('--training_times', type=int, default=5, help='times for updating using one batch data')
@@ -100,7 +100,7 @@ def get_evolution_args_v2():
     parser.add_argument('--inner_batch_size', type=int, default=64, help='kept for compatibility')
     parser.add_argument('--kl_coeff', type=float, default=0.5, help='KL divergence coefficient')
 
-    parser.add_argument('--total_epochs', type=int, default=3000, help='total CR evolution epochs')
+    parser.add_argument('--total_epochs', type=int, default=1000, help='total CR evolution epochs')
     parser.add_argument('--rollout_samples', type=int, default=32, help='raw per-site action samples per outer epoch')
     parser.add_argument('--sample_temperature', type=float, default=1.0, help='temperature for raw binary action sampling')
     parser.add_argument('--ppo_clip_eps', type=float, default=0.2, help='PPO ratio clip epsilon')
