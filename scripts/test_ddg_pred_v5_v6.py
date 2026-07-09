@@ -257,7 +257,7 @@ def main():
 
     # Add test-specific arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument('--log_dir', type=str, default="/home/dataset-local/projects_dir/MERF/logs/pretrain_vm/2026_05_28_23_53_09",
+    parser.add_argument('--log_dir', type=str, default="/home/dataset-local/projects_dir/MERF/logs/pretrain_vm/2026_06_09_16_56_32",
                        help='Path to log directory (e.g., logs/pretrain_vm/2025_11_22_00_40_23)')
     parser.add_argument('--test_datasets', type=str, default='cr_6261_h1',
                        help='Comma-separated list of datasets to test (e.g., vm,abbind,cr_6261_h1,7fae)')
