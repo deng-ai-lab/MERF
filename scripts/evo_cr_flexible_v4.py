@@ -7,6 +7,7 @@ valid, and FoldX creates only the structures actually nominated by the policy.
 
 import argparse
 import datetime
+import math
 import os
 import pickle
 import sys
@@ -86,7 +87,7 @@ def get_args():
     # Checkpoint/model arguments: these defaults match v3/v8 and are overwritten
     # from args.pkl when the chosen checkpoint supplies architecture settings.
     parser.add_argument("--seed", type=int, default=172)
-    parser.add_argument("--lr", type=float, default=1e-6)
+    parser.add_argument("--lr", type=float, default=5e-6)
     parser.add_argument("--adapter_lr", type=float, default=3e-2)
     parser.add_argument("--is_cuda", type=str2bool, default=True)
     parser.add_argument("--gpu_idx", type=int, default=0)
@@ -125,10 +126,13 @@ def get_args():
     parser.add_argument("--kl_loss_weight", type=float, default=0.0)
 
     # v3 PPO settings.
-    parser.add_argument("--total_epochs", type=int, default=200)
+    # FoldX structures are generated on demand.  Five rollout batches with six
+    # PPO updates each retain 30 clipped policy updates while avoiding the
+    # prohibitive 200-batch structural workload of the former default.
+    parser.add_argument("--total_epochs", type=int, default=5)
     parser.add_argument("--rollout_samples", type=int, default=8)
     parser.add_argument("--sample_temperature", type=float, default=1.5)
-    parser.add_argument("--inner_epochs", type=int, default=1)
+    parser.add_argument("--inner_epochs", type=int, default=6)
     parser.add_argument("--ppo_clip_eps", type=float, default=0.2)
     parser.add_argument("--normalize_advantage", type=str2bool, default=True)
     parser.add_argument("--baseline_momentum", type=float, default=0.8)
@@ -136,7 +140,10 @@ def get_args():
     parser.add_argument("--train_mode", choices=["bias_only", "finetune"], default="finetune")
     parser.add_argument("--elite_mode", choices=["none", "old", "hamming"], default="none")
     parser.add_argument("--elite_loss_weight", type=float, default=0.2)
-    parser.add_argument("--elite_top_k", type=int, default=8)
+    # The default rollout has eight candidates.  Keeping all eight as elites
+    # would reinforce bad and good samples alike, so retain only the best two.
+    # Users running larger rollouts can still set this explicitly.
+    parser.add_argument("--elite_top_k", type=int, default=2)
     parser.add_argument("--elite_min_hamming", type=int, default=2)
     parser.add_argument("--entropy_reg_weight", type=float, default=0.0)
     args = parser.parse_args()
@@ -297,6 +304,9 @@ def exact_policy_topk_actions(dataset, binary_log_probs, top_k):
 def rank_metrics(dataset, reverse_keys, prefix):
     ranks = []
     shown_ranks = []
+    num_ranked = len(dataset.rank_by_reverse_key)
+    top1pct_cutoff = int(math.ceil(num_ranked * 0.01))
+    top5pct_cutoff = int(math.ceil(num_ranked * 0.05))
     for key in reverse_keys:
         rank = dataset.evaluate_reverse_key(key)["rank"]
         if rank is None or pd.isna(rank):
@@ -309,6 +319,12 @@ def rank_metrics(dataset, reverse_keys, prefix):
         f"{prefix}_ranked_count": len(ranks),
         f"{prefix}_min_rank": int(min(ranks)) if ranks else np.nan,
         f"{prefix}_mean_rank": float(np.mean(ranks)) if ranks else np.nan,
+        # 命中表示提名候选中至少有一个落入完整实验 landscape 的前 1% / 前 5%。
+        f"{prefix}_landscape_size": num_ranked,
+        f"{prefix}_top1pct_rank_cutoff": top1pct_cutoff,
+        f"{prefix}_top5pct_rank_cutoff": top5pct_cutoff,
+        f"{prefix}_recall_top1pct": int(any(rank <= top1pct_cutoff for rank in ranks)),
+        f"{prefix}_recall_top5pct": int(any(rank <= top5pct_cutoff for rank in ranks)),
         f"{prefix}_selected_keys": "|".join(reverse_keys),
         f"{prefix}_selected_ranks": "|".join(shown_ranks),
     }
