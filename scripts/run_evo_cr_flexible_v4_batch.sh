@@ -44,7 +44,24 @@ while IFS=$'\t' read -r DATASET START_KEY START_EVO_CSV START_ID; do
         exit 1
     fi
 
-    if find "${LOG_ROOT}" -path "*/${START_ID}/final_summary.csv" -print -quit | grep -q .; then
+    # A legacy final_summary.csv was produced from the all-epoch reward cache.
+    # Only a summary explicitly marked as the last completed policy top-k can
+    # suppress a rerun of this start point.
+    if "${PYTHON_BIN}" -c '
+import csv
+import os
+import sys
+
+log_root, start_id = sys.argv[1:]
+for root, _, files in os.walk(log_root):
+    if os.path.basename(root) != start_id or "final_summary.csv" not in files:
+        continue
+    with open(os.path.join(root, "final_summary.csv"), newline="") as handle:
+        row = next(csv.DictReader(handle), None)
+    if row and row.get("final_selection_source") == "last_completed_epoch_policy_topk":
+        sys.exit(0)
+sys.exit(1)
+' "${LOG_ROOT}" "${START_ID}"; then
         echo "SKIP completed: ${START_ID}"
         continue
     fi

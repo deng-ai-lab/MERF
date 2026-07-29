@@ -127,11 +127,13 @@ def main():
             None, None, candidate_cache, dataset, args.policy_eval_top_k
         )
         reward_baseline = None
+        final_epoch = None
         for epoch in range(args.total_epochs):
             reward_baseline, _ = v4.train_one_epoch(
                 args, model, reward_models, reference, optimizer, epoch, dataset, collate_fn,
                 history, device, reward_baseline, candidate_cache, writer,
             )
+            final_epoch = epoch
             _, keys, mean_acquisition, jaccard, improvement = cache_stability(
                 previous_keys, previous_mean_acquisition, candidate_cache, dataset, args.policy_eval_top_k
             )
@@ -162,7 +164,12 @@ def main():
             if should_stop:
                 history.write(f"Early stop after {epoch + 1} outer epochs.\n")
                 break
-        final_metrics = v4.write_final_candidates(args, dataset, candidate_cache, history)
+        if final_epoch is None:
+            raise RuntimeError("No outer epoch completed; cannot write final policy top-k")
+        final_metrics = v4.write_final_candidates(
+            args, model, dataset, collate_fn, reward_models, device,
+            candidate_cache, history, final_epoch,
+        )
         history.write(f"Final metrics: {final_metrics}\n")
     finally:
         writer.close()
