@@ -29,7 +29,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from dataset.dataset_evo_sabdab_v3 import SAbDabEvoDatasetV3
 from model.MERF_v6 import MERF
-from protein.mutate_scripts_foldx_sabdab_v3 import DEFAULT_FOLDX_BIN, mutant_pdb_path
+from protein.mutate_scripts_foldx_sabdab_v3 import (
+    DEFAULT_FOLDX_BIN,
+    format_mutation_token,
+    mutant_pdb_path,
+)
 from protein.read_pdbs import PaddingCollate
 from utils.losshistory import LossHistory
 from utils.util import recursive_to, seed_all
@@ -281,9 +285,12 @@ def make_acquisition(center_scores, std_scores, uncertainty_weight, reward_direc
 
 
 def canonical_mutate_info(mutations):
-    """对实际发生的突变排序；自替换必须在调用此函数前移除。"""
-    ordered = sorted(mutations, key=lambda item: (item[1], item[0], item[2], item[3]))
-    return ",".join(f"{wt_aa}{chain}{position}{mut_aa}" for chain, position, wt_aa, mut_aa in ordered)
+    """对实际发生的突变排序，并保留 PDB insertion code。"""
+    ordered = sorted(mutations, key=lambda item: (item[1], item[2], item[0], item[3], item[4]))
+    return ",".join(
+        format_mutation_token(chain, position, icode, wt_aa, mut_aa)
+        for chain, position, icode, wt_aa, mut_aa in ordered
+    )
 
 
 def generate_mutate_info_list(args, evo_model, train_dataset, collate_fn, device):
@@ -312,9 +319,13 @@ def generate_mutate_info_list(args, evo_model, train_dataset, collate_fn, device
             actions = torch.argmin(qs[policy_batch["mutation_mask"]], dim=1)
             positions = policy_batch["wt"]["resseq"][0][mutation_mask]
             states = policy_batch["wt"]["aa"][0][mutation_mask]
+            selected_indices = torch.nonzero(mutation_mask, as_tuple=True)[0]
+            # PaddingCollate 将单样本的 insertion code 保留为一个字符串；按全局
+            # PDB 索引取字符，防止 C100A/C100B 等位点折叠为相同候选字符串。
+            icodes = policy_batch["wt"]["icode"][0]
 
             actual_mutations = []
-            for state, action, position in zip(states, actions, positions):
+            for global_index, state, action, position in zip(selected_indices, states, actions, positions):
                 state_index = int(state.item())
                 action_index = int(action.item())
                 if state_index == action_index:
@@ -323,6 +334,7 @@ def generate_mutate_info_list(args, evo_model, train_dataset, collate_fn, device
                     (
                         antibody_chain,
                         int(position.item()),
+                        icodes[int(global_index.item())],
                         AA_KEY[state_index],
                         AA_KEY[action_index],
                     )
